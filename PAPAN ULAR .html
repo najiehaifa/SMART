@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMART - Papan Adab Interaktif</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --accent: #f59e0b;
+            --pink: #ff85a1;
+            --orange: #ffb563;
+        }
+
+        body {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            background-color: #fffdf0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+        }
+
+        /* Start Screen */
+        #start-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; z-index: 3000; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+
+        .innovation-name { font-size: 3.5rem; color: var(--primary); margin: 0; font-weight: 900; }
+        .topic-name { font-size: 1.2rem; color: #4b5563; font-weight: bold; margin-bottom: 20px; }
+
+        /* Board Container */
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            width: 95%;
+            max-width: 650px;
+            background: #854d0e;
+            padding: 15px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+        }
+
+        .square {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 900;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+            color: #1e293b;
+        }
+
+        .square:hover { transform: scale(1.05); border: 3px solid white; }
+        .pink { background-color: var(--pink); }
+        .orange { background-color: var(--orange); }
+        .special { background-color: #c7d2fe; font-size: 1.2rem; border: 4px solid var(--primary); }
+
+        /* UI Pop-ups */
+        #modal-overlay, #feedback-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); display: none; z-index: 1000;
+            align-items: center; justify-content: center;
+        }
+
+        #question-modal {
+            background: white; padding: 30px; border-radius: 30px;
+            width: 85%; max-width: 500px; text-align: center; border: 8px solid var(--accent);
+        }
+
+        #modal-question-text { 
+            font-size: 1.5rem; margin: 20px 0; line-height: 1.4; 
+            text-align: left; background: #f0f0f0; padding: 15px; border-radius: 15px;
+        }
+
+        .answer-area { display: flex; gap: 20px; margin-top: 25px; }
+        .nav-btn {
+            flex: 1; padding: 20px; border-radius: 20px; border: none;
+            color: white; font-size: 1.3rem; font-weight: bold; cursor: pointer;
+        }
+
+        #feedback-content { 
+            background: white; padding: 40px; border-radius: 30px; 
+            text-align: center; font-size: 3rem; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div id="start-overlay">
+    <h1 class="innovation-name">SMART</h1>
+    <p class="topic-name">Sayangi yang Muda, Hormati yang Tua</p>
+    <button style="padding:25px 60px; font-size: 2rem; border-radius: 50px; background: var(--primary); color:white; border:none; cursor:pointer;" 
+            onclick="initGame()">MULA MAIN</button>
+</div>
+
+<h1 class="innovation-name">SMART</h1>
+<p class="topic-name">Sayangi yang Muda, Hormati yang Tua</p>
+
+<div id="game-board"></div>
+
+<div id="modal-overlay">
+    <div id="question-modal">
+        <h2 id="modal-title" style="color:var(--primary);"></h2>
+        <div id="modal-question-text"></div>
+        <div class="answer-area">
+            <button class="nav-btn" style="background:var(--danger)" onclick="checkAns('salah')">⬅️ SALAH</button>
+            <button class="nav-btn" style="background:var(--success)" onclick="checkAns('betul')">BETUL ➡️</button>
+        </div>
+    </div>
+</div>
+
+<div id="feedback-screen"><div id="feedback-content"></div></div>
+
+<audio id="snd-click" src="https://actions.google.com/sounds/v1/ui/u_select.ogg"></audio>
+<audio id="snd-correct" src="https://assets.mixkit.co/sfx/preview/mixkit-magic-sparkle-whoosh-2350.mp3"></audio>
+<audio id="snd-wrong" src="https://assets.mixkit.co/sfx/preview/mixkit-wrong-answer-fail-notification-946.mp3"></audio>
+<audio id="snd-claps" src="https://assets.mixkit.co/sfx/preview/mixkit-crowd-applause-427.mp3"></audio>
+
+<script>
+    const questionsArr = [
+        { q: "1. Apakah maksud menghormati orang tua?<br><br>a) Melawan cakap<br>b) Bercakap kasar<br>c) Melayan dengan sopan & mendengar nasihat", a: "betul" },
+        { q: "2. Apakah contoh menyayangi kanak-kanak?<br><br>a) Memarahi tanpa sebab<br>b) Membantu dan menjaga mereka<br>c) Mengabaikan mereka", a: "betul" },
+        { q: "3. Kita perlu bercakap dengan sopan kepada orang tua.", a: "betul" },
+        { q: "4. Menolak permintaan orang tua tanpa alasan adalah perbuatan baik.", a: "salah" },
+        { q: "5. Menyayangi kanak-kanak adalah salah satu ajaran hadis.", a: "betul" },
+        { q: "6. Nyatakan satu cara menghormati orang tua.", a: "betul" },
+        { q: "7. Apakah kesan jika kita menyayangi kanak-kanak?", a: "betul" },
+        { q: "8. Apakah yang diajar dalam hadis tentang hubungan sesama manusia?", a: "betul" },
+        { q: "9. Hadis mengajar kita supaya:<br><br>a) Bersikap sombong<br>b) Menghormati yang tua & menyayangi yang muda", a: "betul" },
+        { q: "10. Apakah kesan menghormati orang tua?<br><br>a) Dibenci orang<br>b) Mendapat keberkatan & kasih sayang", a: "betul" },
+        { q: "11. Bergurau kasar dengan orang tua adalah dibenarkan.", a: "salah" },
+        { q: "12. Menghormati orang tua boleh mengeratkan hubungan.", a: "betul" },
+        { q: "13. Berikan satu contoh perbuatan menyayangi kanak-kanak.", a: "betul" },
+        { q: "14. Jika kita tidak menyayangi kanak-kanak, apa yang berlaku?<br><br>a) Mereka gembira<br>b) Mereka rasa dihargai<br>c) Mereka sedih", a: "betul" },
+        { q: "15. Siapakah yang perlu kita hormati?<br><br>a) Orang kaya sahaja<br>b) Semua orang tua termasuk guru", a: "betul" },
+        { q: "16. Apakah sikap menghormati orang tua?<br><br>a) Menjerit<br>b) Mendengar dengan penuh perhatian", a: "betul" },
+        { q: "17. Menolong orang tua membawa barang adalah perbuatan terpuji.", a: "betul" },
+        { q: "18. Mengapa kita perlu menghormati orang tua?", a: "betul" }
+    ];
+
+    // Susunan "S" (Bawah ke Atas, Mula Bawah-Kiri, Tamat Atas-Kiri)
+    const boardLayout = [
+        ["TAMAT", 18, 17, 16, 15], // Baris 4 (Atas)
+        [10, 11, 12, 13, 14],      // Baris 3
+        [9, 8, 7, 6, 5],           // Baris 2
+        ["MULA", 1, 2, 3, 4]       // Baris 1 (Bawah)
+    ];
+
+    let currentQIndex = 0;
+
+    function playSound(id) {
+        const audio = document.getElementById(id);
+        audio.volume = 1.0;
+        audio.currentTime = 0;
+        audio.play().catch(e => console.log("Audio Error"));
+    }
+
+    function initGame() {
+        document.getElementById('start-overlay').style.display = 'none';
+        const board = document.getElementById('game-board');
+        board.innerHTML = '';
+        
+        boardLayout.forEach(row => {
+            row.forEach(val => {
+                const sq = document.createElement('div');
+                // Warna
+                let colorClass = (val % 2 === 0) ? 'pink' : 'orange';
+                if (typeof val === 'string') colorClass = 'special';
+                
+                sq.className = `square ${colorClass}`;
+                sq.innerText = val;
+                
+                if (typeof val === 'number') {
+                    sq.onclick = function() { openQuestion(val); };
+                }
+                board.appendChild(sq);
+            });
+        });
+        playSound('snd-click');
+    }
+
+    function openQuestion(num) {
+        playSound('snd-click');
+        currentQIndex = num - 1;
+        document.getElementById('modal-title').innerText = "KOTAK " + num;
+        document.getElementById('modal-question-text').innerHTML = questionsArr[currentQIndex].q;
+        document.getElementById('modal-overlay').style.display = 'flex';
+    }
+
+    function checkAns(userChoice) {
+        document.getElementById('modal-overlay').style.display = 'none';
+        const isCorrect = (userChoice === questionsArr[currentQIndex].a);
+        const fbScreen = document.getElementById('feedback-screen');
+        const fbContent = document.getElementById('feedback-content');
+
+        fbScreen.style.display = 'flex';
+        if (isCorrect) {
+            playSound('snd-correct');
+            setTimeout(() => playSound('snd-claps'), 200);
+            fbContent.innerHTML = "<span style='color:var(--success)'>BETUL! 👏</span><br><small style='font-size:1.5rem'>Hebat sekali!</small>";
+        } else {
+            playSound('snd-wrong');
+            fbContent.innerHTML = "<span style='color:var(--danger)'>SALAH! ❌</span><br><small style='font-size:1.5rem'>Cuba Lagi!</small>";
+        }
+
+        setTimeout(() => {
+            fbScreen.style.display = 'none';
+            document.getElementById('snd-claps').pause();
+        }, 3000);
+    }
+</script>
+</body>
+</html>
